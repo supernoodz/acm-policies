@@ -1,0 +1,129 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-ldap-oauth
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: inform
+  disabled: false
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-oauth
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: config.openshift.io/v1
+                kind: OAuth
+                metadata:
+                  name: cluster
+                spec:
+                  identityProviders:
+                  - ldap:
+                      attributes:
+                        id: 
+                        - dn
+                        email: 
+                        - mail
+                        name: 
+                        - cn
+                        preferredUsername: 
+                        - uid
+                      bindDN: >-
+                        ENTER_BINDDN_HERE 
+                      bindPassword: 
+                        name: ldap-secret
+                      ca: 
+                        name: ca-config-map
+                      insecure: false 
+                      url: >-
+                        ENTER_LDAP_URL_HERE
+                    name: ldap 
+                    mappingMethod: claim 
+                    type: LDAP
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-secret
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Secret
+                metadata:
+                  name: ldap-secret
+                  namespace: openshift-config
+                type: Opaque
+                data:
+                  bindPassword: PUT_BASE64_ENCODED_PASSWORD_HERE
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-ldap-ca-bundle
+        spec:
+          remediationAction: inform # will be overridden by remediationAction in parent policy
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition: 
+                kind: ConfigMap
+                apiVersion: v1
+                metadata:
+                  name: ca-config-map
+                  namespace: openshift-config
+                data: 
+                  ca.crt: |-
+                    PUT_CA_CRT_CONTENT_HERE  
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-policy-ldap-oauth
+placementRef:
+  name: placement-policy-ldap-oauth
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+- name: policy-ldap-oauth
+  kind: Policy
+  apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: placement-policy-ldap-oauth
+spec:
+  clusterConditions:
+  - status: "True"
+    type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchExpressions:
+      - {key: oauth, operator: In, values: ["ldap"]}

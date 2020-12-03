@@ -1,0 +1,243 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: policy-ldap-sync
+  annotations:
+    policy.open-cluster-management.io/standards: NIST SP 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: inform
+  disabled: false
+  policy-templates:
+    
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-clusterrole
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: rbac.authorization.k8s.io/v1
+                kind: ClusterRole
+                metadata:
+                  name: ldap-group-sync
+                rules:
+                - apiGroups:
+                  - user.openshift.io
+                  resources:
+                  - groups
+                  verbs:
+                  - create
+                  - update
+                  - patch
+                  - delete
+                  - get
+                  - list
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-namespace
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: Namespace
+                metadata:
+                  name: ldap-sync
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-serviceaccount
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: ldap-sync
+                  namespace: ldap-sync
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-whitelist-txt
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                data:
+                  whitelist.txt: |
+                    CN=Basis Server Admins,OU=Groups,DC=demo,DC=openshift,DC=pub
+                    CN=OCP-Users,OU=Groups,DC=demo,DC=openshift,DC=pub
+                kind: ConfigMap
+                metadata:
+                  name: whitelist-cm
+                  namespace: ldap-sync
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-whitelist-txt
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                data:
+                  ldapsync.yaml: |
+                    kind: LDAPSyncConfig
+                    apiVersion: v1
+                    url: ldaps://domaincontroller
+                    bindDN: service-account
+                    bindPassword: '********'
+                    insecure: false
+                    ca: /ldap-sync/ca.crt
+                    groupUIDNameMapping:
+                      "CN=Basis Server Admins,OU=Groups,DC=demo,DC=openshift,DC=pub": Basis-Server-Admins 
+                    augmentedActiveDirectory:
+                        groupsQuery: 
+                            derefAliases: never
+                            pageSize: 0
+                        groupUIDAttribute: dn 
+                        groupNameAttributes: [ cn ] 
+                        usersQuery:
+                            baseDN: "DC=demo,DC=openshift,DC=pub"
+                            scope: sub
+                            derefAliases: never
+                            filter: (objectclass=person)
+                            pageSize: 0
+                        userNameAttributes: [ sAMAccountName ] 
+                        groupMembershipAttributes: [ "memberOf:1.2.840.113556.1.4.1941:" ]
+                kind: ConfigMap
+                metadata:
+                  name: ldap-sync-cm
+                  namespace: ldap-sync
+
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: ldap-sync-cronjob
+        spec:
+          remediationAction: inform
+          severity: low
+          namespaceSelector:
+            exclude:
+              - kube-*
+            include:
+              - default
+          object-templates:
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: batch/v1beta1
+                kind: CronJob
+                metadata:
+                  name: ldap-group-sync
+                spec:
+                  # Format: https://en.wikipedia.org/wiki/Cron
+                  schedule: '@hourly'
+                  suspend: false
+                  jobTemplate:
+                    spec:
+                      template:
+                        spec:
+                          serviceAccountName: ldap-sync
+                          restartPolicy: Never
+                          containers:
+                            - name: oc-cli
+                              command:
+                                - /bin/oc
+                                - adm
+                                - groups
+                                - sync
+                                - --whitelist=/whitelist/whitelist.txt
+                                - --sync-config=/ldap-sync/ldapsync.yaml
+                                - --confirm
+                              image: registry.redhat.io/openshift4/ose-cli
+                              imagePullPolicy: Always
+                              volumeMounts:
+                              - mountPath: /whitelist/
+                                name: whitelist-txt
+                                readOnly: true
+                              - mountPath: /ldap-sync/
+                                name: ldap-sync-yaml
+                                readOnly: true
+                          volumes:
+                          - name: ldap-sync-yaml
+                            configMap:
+                              name: ldap-sync-cm
+                          - name: whitelist-txt
+                            configMap:
+                              name: whitelist-cm
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: binding-policy-ldap-sync
+placementRef:
+  name: placement-policy-ldap-sync
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
+subjects:
+- name: policy-ldap-sync
+  kind: Policy
+  apiGroup: policy.open-cluster-management.io
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  name: placement-policy-ldap-sync
+spec:
+  clusterConditions:
+  - status: "True"
+    type: ManagedClusterConditionAvailable
+  clusterSelector:
+    matchExpressions:
+      - {key: oauth, operator: In, values: ["ldap"]}
