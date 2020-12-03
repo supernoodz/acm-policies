@@ -117,7 +117,7 @@ spec:
         apiVersion: policy.open-cluster-management.io/v1
         kind: ConfigurationPolicy
         metadata:
-          name: ldap-sync-whitelist-txt
+          name: ldap-sync-yaml
         spec:
           remediationAction: inform
           severity: low
@@ -180,6 +180,7 @@ spec:
                 kind: CronJob
                 metadata:
                   name: ldap-group-sync
+                  namespace: ldap-sync
                 spec:
                   # Format: https://en.wikipedia.org/wiki/Cron
                   schedule: '@hourly'
