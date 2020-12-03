@@ -5,4 +5,4 @@ metadata:
   namespace: acm-policies
 spec:
   type: GitHub
-  pathname: https://github.com/avaleror/acm-policies.git
+  pathname: https://github.com/supernoodz/acm-policies.git
