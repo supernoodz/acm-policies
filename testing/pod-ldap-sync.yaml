@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oc-cli
+spec:
+  serviceAccountName: ldap-sync
+  restartPolicy: Never
+  containers:
+    - name: oc-cli
+      command:
+        - /bin/oc
+        - adm
+        - groups
+        - sync
+        - --whitelist=/whitelist/whitelist.txt
+        - --sync-config=/ldap-sync/ldapsync.yaml
+        - --confirm
+      image: registry.redhat.io/openshift4/ose-cli
+      imagePullPolicy: Always
+      volumeMounts:
+      - mountPath: /whitelist/
+        name: whitelist-txt
+        readOnly: true
+      - mountPath: /ldap-sync/
+        name: ldap-sync-yaml
+        readOnly: true
+  volumes:
+  - name: ldap-sync-yaml
+    configMap:
+      name: ldap-sync-cm
+  - name: whitelist-txt
+    configMap:
+      name: whitelist-cm
