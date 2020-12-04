@@ -31,11 +31,11 @@ spec:
                 kind: ClusterRoleBinding
                 apiVersion: rbac.authorization.k8s.io/v1
                 metadata:
-                  name: cluster-admin-mygroup
+                  name: cluster-admin-CHANGE_ME
                 subjects:
                   - kind: Group
                     apiGroup: rbac.authorization.k8s.io
-                    name: mygroup
+                    name: CHANGE_ME
                 roleRef:
                   apiGroup: rbac.authorization.k8s.io
                   kind: ClusterRole
