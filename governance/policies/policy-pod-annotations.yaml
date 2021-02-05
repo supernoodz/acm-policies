@@ -14,11 +14,12 @@ spec:
         kind: ConfigurationPolicy
         metadata:
           name: policy-pod-annotation
-            exclude: ["kube-*"]
-            include: ["*"]
         spec:
           remediationAction: inform # will be overridden by remediationAction in parent policy
           severity: low
+          namespaceSelector:
+            exclude: ["kube-*"]
+            include: ["*"]
           object-templates:
             - complianceType: mustnothave
               objectDefinition:
@@ -26,7 +27,7 @@ spec:
                 kind: Pod
                 metadata:
                   annotations:
-                    podnoise.io/podnoise_log_rows_total: '0'
+                    podnoise.io/podnoise_log_rows_total: "0"
 ---
 apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
